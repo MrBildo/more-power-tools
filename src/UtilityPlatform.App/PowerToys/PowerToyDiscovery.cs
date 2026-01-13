@@ -7,6 +7,8 @@ public static class PowerToyDiscovery
 {
     public static IReadOnlyList<IPowerToy> DiscoverPowerToys()
     {
+        LoadAssembliesFromBaseDirectory();
+
         var toys = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => a.IsDynamic is false)
                 .SelectMany(GetLoadableTypes)
@@ -18,6 +20,22 @@ public static class PowerToyDiscovery
                                         .ToList();
 
         return toys;
+
+        static void LoadAssembliesFromBaseDirectory()
+        {
+            var baseDirectory = AppContext.BaseDirectory;
+
+            foreach (var assemblyPath in Directory.EnumerateFiles(baseDirectory, "UtilityPlatform*.dll"))
+            {
+                try
+                {
+                    Assembly.LoadFrom(assemblyPath);
+                }
+                catch
+                {
+                }
+            }
+        }
 
         static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
         {
