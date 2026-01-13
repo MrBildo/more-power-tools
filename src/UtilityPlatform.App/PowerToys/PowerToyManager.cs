@@ -33,18 +33,18 @@ public class PowerToyManager
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
-        await _gate.WaitAsync(cancellationToken);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
-            _settings = await _settingsStore.LoadAsync(cancellationToken);
+            _settings = await _settingsStore.LoadAsync(cancellationToken).ConfigureAwait(false);
 
             foreach (var powerToy in _powerToysById.Values)
             {
                 EnsurePowerToyHasConfiguration(powerToy);
             }
 
-            await _settingsStore.SaveAsync(_settings, cancellationToken);
+            await _settingsStore.SaveAsync(_settings, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -55,7 +55,7 @@ public class PowerToyManager
         {
             if (GetPowerToyConfigurationSnapshot(id).IsEnabled)
             {
-                await StartPowerToyAsync(id, powerToy, cancellationToken);
+                await StartPowerToyAsync(id, powerToy, cancellationToken).ConfigureAwait(false);
             }
         }
     }
@@ -90,7 +90,7 @@ public class PowerToyManager
         var shouldStart = false;
         var shouldStop = false;
 
-        await _gate.WaitAsync(cancellationToken);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -104,7 +104,7 @@ public class PowerToyManager
             }
 
             _settings.PowerToys[id].IsEnabled = isEnabled;
-            await _settingsStore.SaveAsync(_settings, cancellationToken);
+            await _settingsStore.SaveAsync(_settings, cancellationToken).ConfigureAwait(false);
 
             shouldStart = isEnabled;
             shouldStop = isEnabled is false;
@@ -116,12 +116,12 @@ public class PowerToyManager
 
         if (shouldStart)
         {
-            await StartPowerToyAsync(id, powerToy, cancellationToken);
+            await StartPowerToyAsync(id, powerToy, cancellationToken).ConfigureAwait(false);
         }
 
         if (shouldStop)
         {
-            await StopPowerToyAsync(id, powerToy, cancellationToken);
+            await StopPowerToyAsync(id, powerToy, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -133,14 +133,14 @@ public class PowerToyManager
         var powerToy = GetPowerToy(id);
         var shouldNotifyToy = false;
 
-        await _gate.WaitAsync(cancellationToken);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
             EnsurePowerToyHasConfiguration(powerToy);
 
             _settings.PowerToys[id].Settings[key] = value;
-            await _settingsStore.SaveAsync(_settings, cancellationToken);
+            await _settingsStore.SaveAsync(_settings, cancellationToken).ConfigureAwait(false);
 
             shouldNotifyToy = _settings.PowerToys[id].IsEnabled;
         }
@@ -152,7 +152,7 @@ public class PowerToyManager
         if (shouldNotifyToy)
         {
             var context = CreateContext(id);
-            await powerToy.OnSettingsChangedAsync(context, cancellationToken);
+            await powerToy.OnSettingsChangedAsync(context, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -177,7 +177,7 @@ public class PowerToyManager
         try
         {
             var context = CreateContext(id);
-            await powerToy.StartAsync(context, cancellationToken);
+            await powerToy.StartAsync(context, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -189,7 +189,7 @@ public class PowerToyManager
     {
         try
         {
-            await powerToy.StopAsync(cancellationToken);
+            await powerToy.StopAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

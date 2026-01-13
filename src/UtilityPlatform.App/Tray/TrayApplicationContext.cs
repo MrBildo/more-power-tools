@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Threading;
 using System.Windows.Forms;
 using UtilityPlatform.App.PowerToys;
 using UtilityPlatform.App.Settings;
@@ -13,6 +14,8 @@ public class TrayApplicationContext : ApplicationContext
     private readonly PowerToyManager _powerToyManager;
 
     private SettingsForm? _settingsForm;
+    private readonly CancellationTokenSource _initializationCts = new();
+    private readonly Task _initializationTask;
 
     public TrayApplicationContext()
     {
@@ -31,15 +34,18 @@ public class TrayApplicationContext : ApplicationContext
         var powerToys = PowerToyDiscovery.DiscoverPowerToys();
 
         _powerToyManager = new(powerToys, settingsStore, _notificationService);
-        _powerToyManager.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
 
-        _notifyIcon.DoubleClick += (_, _) => ShowSettings();
+        _initializationTask = InitializePowerToysAsync(_initializationCts.Token);
+
+        _notifyIcon.DoubleClick += async (_, _) => await ShowSettingsAsync();
     }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
+            _initializationCts.Cancel();
+            _initializationCts.Dispose();
             _settingsForm?.Dispose();
             _notifyIcon.Dispose();
         }
@@ -52,7 +58,7 @@ public class TrayApplicationContext : ApplicationContext
         var contextMenu = new ContextMenuStrip();
 
         var settingsItem = new ToolStripMenuItem("Settings");
-        settingsItem.Click += (_, _) => ShowSettings();
+        settingsItem.Click += async (_, _) => await ShowSettingsAsync();
 
         var exitItem = new ToolStripMenuItem("Exit");
         exitItem.Click += (_, _) => ExitThread();
@@ -64,8 +70,38 @@ public class TrayApplicationContext : ApplicationContext
         return contextMenu;
     }
 
-    private void ShowSettings()
+    private async Task InitializePowerToysAsync(CancellationToken cancellationToken)
     {
+        try
+        {
+            // Don't block the UI thread with a synchronous wait. This avoids deadlocks during tray/menu interaction.
+            await _powerToyManager.InitializeAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _notificationService.ShowError("Utility Platform", ex.Message);
+        }
+    }
+
+    private async Task ShowSettingsAsync()
+    {
+        try
+        {
+            await _initializationTask;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _notificationService.ShowError("Utility Platform", ex.Message);
+            return;
+        }
+
         if (_settingsForm is null || _settingsForm.IsDisposed)
         {
             _settingsForm = new(_powerToyManager);
