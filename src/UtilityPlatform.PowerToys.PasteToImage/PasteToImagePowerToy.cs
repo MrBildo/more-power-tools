@@ -29,17 +29,18 @@ public class PasteToImagePowerToy : IPowerToy
         new(_showNotificationKey, "Show notification", "Show a tray notification after saving the file.", PowerToySettingType.Boolean, true)
     ];
 
-    public Task StartAsync(PowerToyContext context, CancellationToken cancellationToken)
+    public async Task StartAsync(PowerToyContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context, nameof(context));
 
         ApplyConfiguration(context.Configuration);
 
         _staDispatcher = new("PasteToImagePowerToy STA");
-        _keyboardHook = new(HandleKeyboardEvent);
-        _keyboardHook.Start();
-
-        return Task.CompletedTask;
+        await _staDispatcher.RunAsync(() =>
+        {
+            _keyboardHook = new(HandleKeyboardEvent);
+            _keyboardHook.Start();
+        });
 
         bool HandleKeyboardEvent(KeyboardHookEvent keyboardEvent)
         {
@@ -81,15 +82,27 @@ public class PasteToImagePowerToy : IPowerToy
         }
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
+        var dispatcher = _staDispatcher;
+
+        if (dispatcher is not null)
+        {
+            await dispatcher.RunAsync(() =>
+            {
+                _keyboardHook?.Dispose();
+                _keyboardHook = null;
+            });
+
+            dispatcher.Dispose();
+            _staDispatcher = null;
+
+            return;
+        }
+
         _keyboardHook?.Dispose();
         _keyboardHook = null;
-
-        _staDispatcher?.Dispose();
-        _staDispatcher = null;
-
-        return Task.CompletedTask;
+        return;
     }
 
     public Task OnSettingsChangedAsync(PowerToyContext context, CancellationToken cancellationToken)
